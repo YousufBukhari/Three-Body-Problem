@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Alpha Centauri — 3-Body Gravitational Simulation</title>
+<style>
+/* ═══ THEME VARIABLES ═══════════════════════════════════════════════ */
+:root{
+  --bg:#07071a;--surface:#0d0d22;--surface2:#12122a;--surface3:#171730;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);--border3:rgba(255,255,255,0.28);
+  --text:#dde0f0;--text2:#7a7d99;--text3:#3a3d55;
+  --accent:#FF7B45;--accent2:rgba(255,123,69,0.15);
+  --ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--info:#60a5fa;
+  --canvas-bg:#07071a;
+  --r:10px;--r2:6px;--r3:4px;
+}
+[data-theme="light"]{
+  --bg:#f0f0f8;--surface:#ffffff;--surface2:#f5f5fc;--surface3:#ebebf5;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);--border3:rgba(0,0,0,0.3);
+  --text:#1a1a2e;--text2:#5a5a7a;--text3:#b0b0c8;
+  --canvas-bg:#0a0a1a;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);min-height:100vh;padding:14px;font-family:'Courier New',monospace;transition:background .2s,color .2s}
+
+/* ═══ LAYOUT ════════════════════════════════════════════════════════ */
+.header{max-width:1240px;margin:0 auto 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.header h1{font-size:12px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--text2)}
+.header h1 span{color:var(--accent)}
+.tag{font-size:9px;padding:2px 8px;border-radius:3px;background:var(--accent2);color:var(--accent);border:0.5px solid rgba(255,123,69,.3)}
+.header-right{margin-left:auto;display:flex;gap:6px;align-items:center}
+.layout{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:1fr 326px;gap:12px}
+@media(max-width:880px){.layout{grid-template-columns:1fr}}
+.col-right{display:flex;flex-direction:column;gap:11px}
+.col-left{display:flex;flex-direction:column;gap:11px}
+
+/* ═══ PANELS ════════════════════════════════════════════════════════ */
+.panel{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:13px 16px;transition:background .2s,border-color .2s}
+.stitle{font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+
+/* ═══ CANVAS ════════════════════════════════════════════════════════ */
+.canvas-wrap{position:relative}
+canvas{width:100%;border-radius:var(--r2);display:block;background:var(--canvas-bg);cursor:grab}
+canvas.panning{cursor:grabbing}
+.canvas-hint{position:absolute;bottom:34px;right:10px;font-size:9px;color:rgba(255,255,255,0.2);pointer-events:none}
+.canvas-overlay-info{position:absolute;top:8px;left:10px;font-size:9px;color:rgba(255,255,255,0.45);pointer-events:none;line-height:1.8}
+.collision-flash{animation:cflash .4s ease-out}
+@keyframes cflash{0%{box-shadow:0 0 0 4px rgba(255,123,69,0.8)}100%{box-shadow:none}}
+
+/* ═══ BUTTONS ═══════════════════════════════════════════════════════ */
+button{font-family:'Courier New',monospace;font-size:10px;padding:5px 11px;border-radius:var(--r2);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;transition:background .12s,border-color .12s}
+button:hover{background:rgba(128,128,200,0.1)}
+button.on{background:rgba(255,255,255,.09);border-color:var(--border3)}
+button.accent{background:var(--accent2);border-color:rgba(255,123,69,.4);color:#ffb89a}
+button.accent:hover{background:rgba(255,123,69,.25)}
+button.info-btn{background:rgba(96,165,250,.1);border-color:rgba(96,165,250,.3);color:var(--info)}
+button.danger{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:var(--bad)}
+.btns{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+
+/* ═══ INPUTS ════════════════════════════════════════════════════════ */
+.ctrl{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.ctrl label{font-size:10px;color:var(--text2);width:150px;flex-shrink:0;line-height:1.3}
+.ctrl input[type=range]{flex:1;-webkit-appearance:none;height:2px;background:var(--border2);border-radius:2px;outline:none;min-width:0}
+.ctrl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--text);cursor:pointer}
+.ctrl input[type=number]{width:80px;flex-shrink:0;font-family:'Courier New',monospace;font-size:10px;background:var(--surface2);color:var(--text);border:0.5px solid var(--border2);border-radius:var(--r3);padding:3px 6px;outline:none;-moz-appearance:textfield}
+.ctrl input[type=number]:focus{border-color:var(--border3)}
+.ctrl input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+input[type=text]{font-family:'Courier New',monospace;font-size:10px;background:var(--surface2);color:var(--text);border:0.5px solid var(--border2);border-radius:var(--r2);padding:5px 8px;outline:none;width:100%}
+input[type=text]:focus{border-color:var(--border3)}
+.hr{height:0.5px;background:var(--border);margin:9px 0}
+.apply-btn{width:100%;margin-top:8px;padding:7px;font-size:10px;font-family:'Courier New',monospace;border:0.5px solid var(--border2);background:var(--surface2);color:var(--text);border-radius:var(--r2);cursor:pointer}
+.apply-btn:hover{background:var(--surface3)}
+
+/* ═══ STATS ═════════════════════════════════════════════════════════ */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat{background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--r2);padding:8px 10px}
+.stat .n{font-size:14px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .l{font-size:9px;color:var(--text2);margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:3px}
+.b-ok{background:rgba(74,222,128,.12);color:var(--ok);border:0.5px solid rgba(74,222,128,.25)}
+.b-warn{background:rgba(251,191,36,.12);color:var(--warn);border:0.5px solid rgba(251,191,36,.25)}
+.b-bad{background:rgba(248,113,113,.12);color:var(--bad);border:0.5px solid rgba(248,113,113,.25)}
+.ebar-wrap{margin-top:9px}
+.ebar-lbl{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;display:flex;justify-content:space-between}
+.ebar-bg{height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.ebar-fill{height:100%;border-radius:2px;transition:width .3s,background .3s}
+
+/* ═══ KEPLER GRID ════════════════════════════════════════════════════ */
+.kepler-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+.kg-row{background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--r3);padding:6px 9px}
+.kg-row .kl{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.kg-row .kv{font-size:11px;font-weight:500;color:var(--text)}
+
+/* ═══ TABS ══════════════════════════════════════════════════════════ */
+.tabs{display:flex;gap:0;border-bottom:0.5px solid var(--border);margin-bottom:10px}
+.tab{font-family:'Courier New',monospace;font-size:10px;padding:6px 10px;background:transparent;border:none;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;white-space:nowrap}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ═══ PRESET LIBRARY ════════════════════════════════════════════════ */
+.pg-label{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;margin:8px 0 4px;padding-left:6px;border-left:2px solid var(--accent)}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.pg.single{grid-template-columns:1fr}
+.pb{font-family:'Courier New',monospace;font-size:9px;padding:6px 8px;border-radius:var(--r2);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;text-align:left;line-height:1.4}
+.pb:hover{background:rgba(128,128,200,.08)}
+.pb.active{background:var(--accent2);border-color:rgba(255,123,69,.4);color:#ffb89a}
+.pb .pbn{font-weight:500;display:block}
+.pb .pbs{font-size:8px;color:var(--text2)}
+
+/* ═══ SAVE / LOAD ════════════════════════════════════════════════════ */
+.save-row{display:flex;gap:6px;margin-bottom:8px}
+.slot{display:flex;align-items:center;gap:8px;background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--r2);padding:8px 10px;margin-bottom:5px}
+.slot-info{flex:1;min-width:0}
+.slot-name{font-size:10px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot-meta{font-size:9px;color:var(--text2);margin-top:1px}
+.slot-acts{display:flex;gap:4px;flex-shrink:0}
+.slot-acts button{padding:3px 8px;font-size:9px}
+.empty-state{font-size:10px;color:var(--text3);text-align:center;padding:16px;border:0.5px dashed var(--border2);border-radius:var(--r2)}
+
+/* ═══ LEGEND ════════════════════════════════════════════════════════ */
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.leg{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2)}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ═══ ZOOM ROW ══════════════════════════════════════════════════════ */
+.zoom-row{display:flex;align-items:center;gap:5px;margin-top:7px;flex-wrap:wrap}
+.zoom-lbl{font-size:10px;color:var(--text2);min-width:60px}
+
+/* ═══ THEME TOGGLE ══════════════════════════════════════════════════ */
+.theme-btn{padding:5px 10px;font-size:11px}
+
+/* ═══ COLLISION BADGE ═══════════════════════════════════════════════ */
+.coll-log{max-height:80px;overflow-y:auto;font-size:9px;color:var(--text2);margin-top:6px;line-height:1.7}
+.coll-log span{color:var(--warn)}
+
+/* ═══ TOOLTIP ════════════════════════════════════════════════════════ */
+.tip{position:relative;display:inline-flex;align-items:center;gap:4px}
+.tip-icon{width:12px;height:12px;border-radius:50%;border:0.5px solid var(--text3);color:var(--text3);font-size:8px;display:inline-flex;align-items:center;justify-content:center;cursor:help;flex-shrink:0;line-height:1;font-style:normal}
+.tip-icon:hover{border-color:var(--info);color:var(--info)}
+.tipbox{display:none;position:absolute;z-index:9999;bottom:calc(100% + 7px);left:0;transform:none;background:#1a1a35;border:0.5px solid rgba(96,165,250,0.35);border-radius:6px;padding:8px 11px;width:230px;font-size:9.5px;color:#c0c8e8;line-height:1.6;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.6)}
+.tipbox::after{content:'';position:absolute;top:100%;left:12px;border:5px solid transparent;border-top-color:#1a1a35}
+.tip-icon:hover+.tipbox{display:block}
+
+/* ═══ FULLSCREEN ════════════════════════════════════════════════════ */
+.fs-btn{position:absolute;top:8px;right:10px;background:rgba(0,0,0,0.55);border:0.5px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);font-size:11px;padding:3px 7px;border-radius:4px;cursor:pointer;z-index:10;transition:background .15s,color .15s;font-family:'Courier New',monospace}
+.fs-btn:hover{background:rgba(0,0,0,0.8);color:#fff}
+.canvas-wrap.in-fullscreen{position:fixed!important;inset:0;z-index:9998;background:#07071a;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch}
+.canvas-wrap.in-fullscreen canvas{width:100%!important;height:100%!important;border-radius:0;flex:1}
+.canvas-wrap.in-fullscreen .fs-btn{top:12px;right:14px;font-size:13px}
+.canvas-wrap.in-fullscreen .canvas-hint{bottom:14px;right:14px}
+.canvas-wrap.in-fullscreen .canvas-overlay-info{top:14px;left:14px}
+
+/* ═══ NAME EDITOR ════════════════════════════════════════════════════ */
+.name-editor{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:9px}
+.ne-wrap{display:flex;flex-direction:column;gap:2px}
+.ne-lbl{font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:3px}
+.ne-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ne-inp{font-family:'Courier New',monospace;font-size:10px;background:var(--surface2);color:var(--text);border:0.5px solid var(--border2);border-radius:var(--r3);padding:4px 6px;outline:none;width:100%}
+.ne-inp:focus{border-color:var(--border3)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Alpha Centauri — <span>3-body gravitational simulation</span></h1>
+  <span class="tag">RK4 · adaptive dt · AU space · barycentre-corrected</span>
+  <div class="header-right">
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">☀ light</button>
+  </div>
+</div>
+
+<div class="layout">
+
+<!-- ══════════ LEFT COLUMN ══════════════════════════════════════════ -->
+<div class="col-left">
+
+  <!-- Canvas -->
+  <div class="panel">
+    <div class="stitle">
+      <span>Simulation canvas</span>
+      <span id="presetLabel" style="color:var(--accent);font-size:9px">Proxima Centauri</span>
+    </div>
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="c" height="440"></canvas>
+      <button class="fs-btn" id="btnFS" title="Toggle fullscreen">⛶</button>
+      <div class="canvas-hint">scroll = zoom · drag = pan · F = fullscreen</div>
+      <div class="canvas-overlay-info" id="canvasInfo"></div>
+    </div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" id="dotA" style="background:#FF7B45"></div><span id="lgA">Body A</span></div>
+      <div class="leg"><div class="leg-dot" id="dotB" style="background:#3ECFC6"></div><span id="lgB">Body B</span></div>
+      <div class="leg"><div class="leg-dot" id="dotC" style="background:#9B7FFA"></div><span id="lgC">Body C</span></div>
+    </div>
+    <div id="presetDesc" style="margin-top:6px;font-size:10px;color:var(--text2);line-height:1.6;min-height:14px"></div>
+    <div class="btns">
+      <button id="btnPlay" class="on">⏸ pause</button>
+      <button id="btnReset">↺ reset</button>
+      <button id="btnTrails" class="on">trails on</button>
+      <button id="btnPerturb">⚡ perturb</button>
+      <button id="btnCentre" class="info-btn">⊙ recentre</button>
+      <button id="btnCollision" class="on">💥 collisions on</button>
+    </div>
+    <div class="zoom-row">
+      <span class="zoom-lbl" id="zoomLbl">zoom 1.00×</span>
+      <button onclick="zoomBy(1.25)">＋</button>
+      <button onclick="zoomBy(0.8)">－</button>
+      <button onclick="resetView()">fit</button>
+      <button onclick="exportSVG()" class="info-btn" style="margin-left:auto">↓ export SVG</button>
+      <button onclick="exportPNG()" class="info-btn">↓ export PNG</button>
+    </div>
+    <div class="coll-log" id="collLog"></div>
+  </div>
+
+  <!-- Kepler stats -->
+  <div class="panel" id="keplerPanel">
+    <div class="stitle">Kepler orbital stats</div>
+    <div class="kepler-grid">
+      <div class="kg-row"><div class="kl tip">b orbital period <i class="tip-icon">?</i><div class="tipbox"><b>Orbital Period — Body B</b><br>T = 2π√(a³/GM☉). Time for one complete orbit around the star. Uses the Keplerian approximation assuming the star dominates (valid when mₚ ≪ M☉).</div></div><div class="kv" id="kPb">—</div></div>
+      <div class="kg-row"><div class="kl tip">d orbital period <i class="tip-icon">?</i><div class="tipbox"><b>Orbital Period — Body C</b><br>Same as Body B formula. If bodies B &amp; C are in resonance (e.g. 2:1 ratio), their gravitational interaction stabilises — watch for near-integer ratios staying locked.</div></div><div class="kv" id="kPd">—</div></div>
+      <div class="kg-row"><div class="kl tip">b apoapsis <i class="tip-icon">?</i><div class="tipbox"><b>Apoapsis — Body B</b><br>Farthest point from the star: a(1+e). High eccentricity = large difference between apoapsis and periapsis = strongly elliptical orbit.</div></div><div class="kv" id="kApB">—</div></div>
+      <div class="kg-row"><div class="kl tip">d apoapsis <i class="tip-icon">?</i><div class="tipbox"><b>Apoapsis — Body C</b><br>Farthest orbital point for Body C. When Body C's apoapsis overlaps Body B's periapsis region, close encounters become possible.</div></div><div class="kv" id="kApD">—</div></div>
+      <div class="kg-row"><div class="kl tip">b periapsis <i class="tip-icon">?</i><div class="tipbox"><b>Periapsis — Body B</b><br>Closest point to the star: a(1−e). At periapsis, the body moves fastest (vis-viva law). Very small periapsis → very high speed → dt shrinks to maintain accuracy.</div></div><div class="kv" id="kPeB">—</div></div>
+      <div class="kg-row"><div class="kl tip">d periapsis <i class="tip-icon">?</i><div class="tipbox"><b>Periapsis — Body C</b><br>Closest orbital point for Body C. If eccentricity is high, periapsis can approach the stellar radius — use collision radius to model this.</div></div><div class="kv" id="kPeD">—</div></div>
+      <div class="kg-row"><div class="kl tip">b semi-major axis <i class="tip-icon">?</i><div class="tipbox"><b>Semi-Major Axis — Body B</b><br>Half the long axis of the ellipse. Determines average orbital distance and period. Kepler's 3rd law: T² ∝ a³.</div></div><div class="kv" id="kSmaB">—</div></div>
+      <div class="kg-row"><div class="kl tip">d semi-major axis <i class="tip-icon">?</i><div class="tipbox"><b>Semi-Major Axis — Body C</b><br>Set via the "d semi-major axis" slider in Params. Changing this while keeping the period ratio fixed preserves mean-motion resonance.</div></div><div class="kv" id="kSmaD">—</div></div>
+      <div class="kg-row"><div class="kl tip">b velocity (km/s) <i class="tip-icon">?</i><div class="tipbox"><b>Live Speed — Body B (km/s)</b><br>Converted from AU/yr using 1 AU/yr = 29.7827 km/s. Actual Alpha Cen Bb orbital speed is ~10–60 km/s depending on phase.</div></div><div class="kv" id="kVb">—</div></div>
+      <div class="kg-row"><div class="kl tip">d velocity (km/s) <i class="tip-icon">?</i><div class="tipbox"><b>Live Speed — Body C (km/s)</b><br>Same conversion. The inner body always moves faster than the outer at equivalent phases — directly observable in the simulation.</div></div><div class="kv" id="kVd">—</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ RIGHT COLUMN ═════════════════════════════════════════ -->
+<div class="col-right">
+
+  <div class="panel">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('params')">Params</button>
+      <button class="tab" onclick="switchTab('presets')">Presets (20)</button>
+      <button class="tab" onclick="switchTab('saves')">💾 Saves</button>
+    </div>
+
+    <!-- ── PARAMS TAB ─────────────────────────────────────────────── -->
+    <div class="tab-panel active" id="tab-params">
+
+      <!-- Body name editor (always visible) -->
+      <div class="stitle" style="margin-bottom:6px">Body names</div>
+      <div class="name-editor">
+        <div class="ne-wrap">
+          <div class="ne-lbl"><div class="ne-dot" style="background:#FF7B45"></div>Star / Body A</div>
+          <input class="ne-inp" id="nameA" value="Alpha Cen A" maxlength="18">
+        </div>
+        <div class="ne-wrap">
+          <div class="ne-lbl"><div class="ne-dot" style="background:#3ECFC6"></div>Body B</div>
+          <input class="ne-inp" id="nameB" value="Alpha Cen B" maxlength="18">
+        </div>
+        <div class="ne-wrap">
+          <div class="ne-lbl"><div class="ne-dot" style="background:#9B7FFA"></div>Body C</div>
+          <input class="ne-inp" id="nameC" value="Proxima Cen" maxlength="18">
+        </div>
+      </div>
+      <button class="apply-btn" id="btnApplyNames" style="margin-bottom:10px">apply names ↺</button>
+      <div class="hr"></div>
+
+      <div id="realParams">
+        <div style="font-size:9px;color:var(--text2);margin-bottom:8px">Slider = quick adjust. Number box = any value, no limits.</div>
+        <div class="ctrl"><label class="tip">Star mass (M☉) <i class="tip-icon">?</i><div class="tipbox"><b>Stellar Mass</b><br>Mass of the central star in Solar masses (M☉ = 1.989×10³⁰ kg). Larger mass → stronger gravity → shorter orbital periods. Alpha Cen A ≈ 1.1 M☉, Proxima Cen ≈ 0.122 M☉.</div></label>
+          <input type="range" id="mStar" min="0.01" max="5" step="0.001" value="1.1">
+          <input type="number" id="nMstar" value="1.1" step="0.001"></div>
+        <div class="ctrl" style="flex-wrap:wrap;gap:4px 6px">
+          <label class="tip" style="width:100%;display:flex;align-items:center;gap:4px">Body B mass <button id="unitBtnB" onclick="toggleUnitB(event)" style="font-size:8px;padding:1px 5px;border-radius:3px;height:16px;line-height:1;margin:0 2px">M⊕</button> <i class="tip-icon">?</i><div class="tipbox"><b>Body B Mass</b><br>Mass in Earth masses (M⊕) or Solar masses (M☉). Toggle the unit button on the label. 1 M☉ = 333,000 M⊕. At typical planetary masses (&lt;100 M⊕), perturbation on the star is negligible but body–body interaction can still destabilise orbits.</div></label>
+          <input type="range" id="mB" min="0.1" max="100" step="0.1" value="1.17" style="flex:1;min-width:0">
+          <input type="number" id="nMb" value="1.17" step="0.01"></div>
+        <div class="ctrl" style="flex-wrap:wrap;gap:4px 6px">
+          <label class="tip" style="width:100%;display:flex;align-items:center;gap:4px">Body C mass <button id="unitBtnC" onclick="toggleUnitC(event)" style="font-size:8px;padding:1px 5px;border-radius:3px;height:16px;line-height:1;margin:0 2px">M⊕</button> <i class="tip-icon">?</i><div class="tipbox"><b>Body C Mass</b><br>Mass in Earth masses (M⊕) or Solar masses (M☉). Toggle the unit button on the label. 1 M☉ = 333,000 M⊕. Try cranking to 0.9 M☉ (≈α Cen B) to watch a stellar companion disrupt the inner body.</div></label>
+          <input type="range" id="mD" min="0.1" max="400000" step="0.1" value="0.26" style="flex:1;min-width:0">
+          <input type="number" id="nMd" value="0.26" step="0.01"></div>
+        <div class="hr"></div>
+        <div class="ctrl"><label class="tip">B semi-major axis (AU) <i class="tip-icon">?</i><div class="tipbox"><b>Semi-Major Axis — Body B</b><br>Average orbital radius in AU (1 AU = Earth–Sun distance = 149.6×10⁶ km). Directly sets orbital period via Kepler's 3rd law. Alpha Cen Bb candidate ≈ 0.04 AU.</div></label>
+          <input type="range" id="aB" min="0.005" max="2" step="0.001" value="0.5">
+          <input type="number" id="nAb" value="0.5" step="0.001"></div>
+        <div class="ctrl"><label class="tip">C semi-major axis (AU) <i class="tip-icon">?</i><div class="tipbox"><b>Semi-Major Axis — Body C</b><br>Orbital radius for Body C. The ratio aB/aC determines whether bodies can interact strongly. A ratio near small integers (1:2, 1:3) creates mean-motion resonance — stable or chaotic depending on eccentricities.</div></label>
+          <input type="range" id="aD" min="0.005" max="2" step="0.001" value="1.09">
+          <input type="number" id="nAd" value="1.09" step="0.001"></div>
+        <div class="ctrl"><label class="tip">B eccentricity <i class="tip-icon">?</i><div class="tipbox"><b>Orbital Eccentricity — Body B</b><br>0 = perfect circle · 0.5 = noticeably elliptical · →1 = parabolic escape trajectory. High eccentricity brings the body much closer to the star at periapsis, increasing interaction probability with Body C.</div></label>
+          <input type="range" id="eB" min="0" max="0.99" step="0.01" value="0.0">
+          <input type="number" id="nEb" value="0.0" step="0.01"></div>
+        <div class="ctrl"><label class="tip">C eccentricity <i class="tip-icon">?</i><div class="tipbox"><b>Orbital Eccentricity — Body C</b><br>Alpha Cen B's actual eccentricity (the binary companion) ≈ 0.52. Increasing eccentricity while keeping aD large creates wide, sweeping ellipses that can disrupt Body B's orbit via repeated close passes.</div></label>
+          <input type="range" id="eD" min="0" max="0.99" step="0.01" value="0.52">
+          <input type="number" id="nEd" value="0.52" step="0.01"></div>
+        <div class="hr"></div>
+        <div class="ctrl"><label class="tip">Phase offset b/c (°) <i class="tip-icon">?</i><div class="tipbox"><b>Initial Phase Offset</b><br>Angular separation between Body B and Body C at t=0, in degrees. 0° = both start on the same side. 180° = opposition. This is the biggest driver of early-time chaos — tiny changes here produce completely different long-term trajectories.</div></label>
+          <input type="range" id="phi" min="0" max="360" step="1" value="90">
+          <input type="number" id="nPhi" value="90" step="1"></div>
+        <div class="ctrl"><label class="tip">Collision radius (AU) <i class="tip-icon">?</i><div class="tipbox"><b>Collision Detection Radius</b><br>If two bodies come within this distance, they merge inelastically (momentum conserved, mass combined). Use very small values (≈0.001) for nearly point-like bodies, or larger values (≈0.01) to model stellar radii and engulfment events.</div></label>
+          <input type="range" id="collR" min="0.0001" max="0.02" step="0.0001" value="0.003">
+          <input type="number" id="nCollR" value="0.003" step="0.0001"></div>
+        <div class="ctrl"><label class="tip">Display speed <i class="tip-icon">?</i><div class="tipbox"><b>Display Speed (steps/frame)</b><br>Positive = steps per frame (faster). <b>Negative = slow-motion</b>: -1 runs 1 step every 2 frames, -5 every 6 frames, -10 every 11 frames. Zero = 1 step/frame. Does not affect physics accuracy.</div></label>
+          <input type="range" id="spd" min="-10" max="300" step="1" value="20">
+          <input type="number" id="nSpd" value="20" step="1"></div>
+
+        <button class="apply-btn" id="btnApply">apply & reset ↺</button>
+      </div>
+
+      <div id="periodicParams" style="display:none">
+        <div class="ctrl"><label class="tip">Display speed <i class="tip-icon">?</i><div class="tipbox"><b>Display Speed</b><br>Positive = steps per frame. <b>Negative = slow-motion</b>: frame-skipping so each physics step plays back slowly. Great for watching choreography in detail.</div></label>
+          <input type="range" id="spd2" min="-10" max="600" step="1" value="60">
+          <input type="number" id="nSpd2" value="60" step="1"></div>
+        <div class="ctrl"><label class="tip">Collision radius (units) <i class="tip-icon">?</i><div class="tipbox"><b>Collision Radius (periodic)</b><br>Merge threshold in normalised simulation units. For figure-eight and choreography presets, set to 0.05–0.1 to allow merges when bodies pass close. Set to 0.001 for near-miss studies.</div></label>
+          <input type="range" id="collR2" min="0.001" max="0.2" step="0.001" value="0.05">
+          <input type="number" id="nCollR2" value="0.05" step="0.001"></div>
+        <div style="margin-top:8px;font-size:10px;color:var(--text2);line-height:1.7">Periodic preset active. Use <b style="color:var(--text)">⚡ perturb</b> to explore sensitivity, or save this preset via the 💾 Saves tab.</div>
+      </div>
+    </div>
+
+    <!-- ── PRESETS TAB ────────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-presets">
+      <div class="pg-label">Classical (Euler & Lagrange, 1767–1772)</div>
+      <div class="pg">
+        <button class="pb" onclick="loadPreset('lagrange_equilateral')"><span class="pbn">Lagrange equilateral</span><span class="pbs">1772 · equilateral △</span></button>
+        <button class="pb" onclick="loadPreset('euler_collinear1')"><span class="pbn">Euler collinear L1</span><span class="pbs">1767 · equal mass</span></button>
+        <button class="pb" onclick="loadPreset('euler_collinear2')"><span class="pbn">Euler collinear L2</span><span class="pbs">1767 · unequal 1:2:3</span></button>
+        <button class="pb" onclick="loadPreset('euler_collinear3')"><span class="pbn">Pythagorean 3:4:5</span><span class="pbs">Burrau 1913 · free-fall</span></button>
+      </div>
+      <div class="pg-label">Figure-eight (Moore 1993 / Chenciner 2000)</div>
+      <div class="pg">
+        <button class="pb" onclick="loadPreset('figure8')"><span class="pbn">Figure-eight</span><span class="pbs">1993 · choreography</span></button>
+        <button class="pb" onclick="loadPreset('figure8_perturbed')"><span class="pbn">Figure-eight +noise</span><span class="pbs">sensitivity demo</span></button>
+      </div>
+      <div class="pg-label">Broucke–Hénon family (1975–1976)</div>
+      <div class="pg">
+        <button class="pb" onclick="loadPreset('broucke_a1')"><span class="pbn">Broucke A1</span><span class="pbs">1975 · retrograde</span></button>
+        <button class="pb" onclick="loadPreset('broucke_a2')"><span class="pbn">Hénon IIa</span><span class="pbs">1976 · symmetric</span></button>
+        <button class="pb" onclick="loadPreset('henon_2a')"><span class="pbn">Hénon IIb</span><span class="pbs">1976 · asymmetric</span></button>
+        <button class="pb" onclick="loadPreset('henon_2b')"><span class="pbn">Hénon R1</span><span class="pbs">1976 · reverse</span></button>
+      </div>
+      <div class="pg-label">Šuvakov & Dmitrašinović 2013</div>
+      <div class="pg">
+        <button class="pb" onclick="loadPreset('bumblebee')"><span class="pbn">Bumblebee</span><span class="pbs">I.A</span></button>
+        <button class="pb" onclick="loadPreset('moth_i')"><span class="pbn">Moth I</span><span class="pbs">I.B</span></button>
+        <button class="pb" onclick="loadPreset('moth_ii')"><span class="pbn">Moth II</span><span class="pbs">I.C</span></button>
+        <button class="pb" onclick="loadPreset('butterfly_i')"><span class="pbn">Butterfly I</span><span class="pbs">II.A</span></button>
+        <button class="pb" onclick="loadPreset('butterfly_ii')"><span class="pbn">Butterfly II</span><span class="pbs">II.B</span></button>
+        <button class="pb" onclick="loadPreset('goggles')"><span class="pbn">Goggles</span><span class="pbs">II.C</span></button>
+        <button class="pb" onclick="loadPreset('dragonfly')"><span class="pbn">Dragonfly</span><span class="pbs">III.A</span></button>
+        <button class="pb" onclick="loadPreset('yarn')"><span class="pbn">Yarn</span><span class="pbs">III.B</span></button>
+        <button class="pb" onclick="loadPreset('yin_yang_1a')"><span class="pbn">Yin-yang 1a</span><span class="pbs">IV.A</span></button>
+        <button class="pb" onclick="loadPreset('yin_yang_1b')"><span class="pbn">Yin-yang 1b</span><span class="pbs">IV.B</span></button>
+      </div>
+      <div class="pg-label">Real astrophysical systems</div>
+      <div class="pg">
+        <button class="pb active" onclick="loadPreset('alpha_centauri')"><span class="pbn">Alpha Centauri system</span><span class="pbs">α Cen A + B + planet candidate</span></button>
+        <button class="pb" onclick="loadPreset('proxima')"><span class="pbn">Proxima Centauri system</span><span class="pbs">ESO/NASA · real masses & orbits</span></button>
+      </div>
+    </div>
+
+    <!-- ── SAVES TAB ──────────────────────────────────────────────── -->
+    <div class="tab-panel" id="tab-saves">
+      <div style="font-size:10px;color:var(--text2);margin-bottom:9px;line-height:1.6">Save any configuration as a named slot. Slots persist in your browser across sessions. Export to back up or share.</div>
+      <div class="save-row">
+        <input type="text" id="saveNameInput" placeholder="name this configuration…" maxlength="48" style="flex:1">
+        <button class="accent" onclick="saveSlot()" style="flex-shrink:0">💾 save</button>
+      </div>
+      <div id="slotList"></div>
+      <div class="hr"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="exportJSON()" class="info-btn">↓ export JSON</button>
+        <button onclick="triggerImport()" class="info-btn">↑ import JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════════════════════════════ */
+const G_AU=39.478, M_E=1/333000, YR2DAY=365.25, AU2KMS=29.7827;
+
+/* ═══════════════════════════════════════════════════════════════════
+   CANVAS & VIEW
+═══════════════════════════════════════════════════════════════════ */
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+let W,H,DPR, baseScale=1, viewZoom=1, panX=0, panY=0;
+let isPanning=false, panLast={x:0,y:0}, lastTouchDist=null;
+let isFullscreen=false;
+
+function resizeCanvas(){
+  DPR=devicePixelRatio||1;
+  const r=canvas.getBoundingClientRect();
+  W=r.width||canvas.offsetWidth||800;
+  H=isFullscreen?(window.innerHeight):440;
+  canvas.width=W*DPR; canvas.height=H*DPR;
+  canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize',resizeCanvas);
+resizeCanvas();
+
+function w2s(x,y){return{px:W/2+(x+panX)*baseScale*viewZoom, py:H/2-(y+panY)*baseScale*viewZoom};}
+function s2w(px,py){return{x:(px-W/2)/(baseScale*viewZoom)-panX, y:-(py-H/2)/(baseScale*viewZoom)-panY};}
+
+canvas.addEventListener('wheel',e=>{e.preventDefault();viewZoom=Math.max(0.02,Math.min(400,viewZoom*(e.deltaY<0?1.15:1/1.15)));updateZL();},{passive:false});
+canvas.addEventListener('mousedown',e=>{isPanning=true;panLast={x:e.clientX,y:e.clientY};canvas.classList.add('panning');});
+window.addEventListener('mousemove',e=>{if(!isPanning)return;panX+=(e.clientX-panLast.x)/(baseScale*viewZoom);panY-=(e.clientY-panLast.y)/(baseScale*viewZoom);panLast={x:e.clientX,y:e.clientY};});
+window.addEventListener('mouseup',()=>{isPanning=false;canvas.classList.remove('panning');});
+canvas.addEventListener('touchstart',e=>{if(e.touches.length===1){isPanning=true;panLast={x:e.touches[0].clientX,y:e.touches[0].clientY};}if(e.touches.length===2)lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);},{passive:true});
+canvas.addEventListener('touchmove',e=>{if(e.touches.length===1&&isPanning){panX+=(e.touches[0].clientX-panLast.x)/(baseScale*viewZoom);panY-=(e.touches[0].clientY-panLast.y)/(baseScale*viewZoom);panLast={x:e.touches[0].clientX,y:e.touches[0].clientY};}if(e.touches.length===2&&lastTouchDist){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);viewZoom=Math.max(0.02,Math.min(400,viewZoom*(d/lastTouchDist)));lastTouchDist=d;updateZL();}},{passive:true});
+canvas.addEventListener('touchend',()=>{isPanning=false;lastTouchDist=null;});
+
+function zoomBy(f){viewZoom=Math.max(0.02,Math.min(400,viewZoom*f));updateZL();}
+function resetView(){viewZoom=1;panX=0;panY=0;updateZL();}
+function updateZL(){document.getElementById('zoomLbl').textContent='zoom '+viewZoom.toFixed(2)+'×';}
+document.getElementById('btnCentre').addEventListener('click',()=>{panX=0;panY=0;});
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME TOGGLE
+═══════════════════════════════════════════════════════════════════ */
+let isDark=true;
+function toggleTheme(){
+  isDark=!isDark;
+  document.documentElement.setAttribute('data-theme',isDark?'dark':'light');
+  document.getElementById('themeBtn').textContent=isDark?'☀ light':'☾ dark';
+  bgStars=null; // regenerate
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB SYSTEM
+═══════════════════════════════════════════════════════════════════ */
+function switchTab(name){
+  const names=['params','presets','saves'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',names[i]===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='saves') renderSlots();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SLIDER ↔ NUMBER SYNC (no limits on number input)
+═══════════════════════════════════════════════════════════════════ */
+const PAIRS=[['mStar','nMstar'],['mB','nMb'],['mD','nMd'],['aB','nAb'],['aD','nAd'],
+  ['eB','nEb'],['eD','nEd'],['phi','nPhi'],['collR','nCollR'],['spd','nSpd'],
+  ['spd2','nSpd2'],['collR2','nCollR2']];
+PAIRS.forEach(([sid,nid])=>{
+  const sl=document.getElementById(sid),nb=document.getElementById(nid);
+  if(!sl||!nb)return;
+  sl.addEventListener('input',()=>{nb.value=sl.value;});
+  nb.addEventListener('input',()=>{const v=parseFloat(nb.value);if(!isNaN(v))sl.value=Math.min(Math.max(v,parseFloat(sl.min)||0),parseFloat(sl.max)||1e9);});
+});
+function getN(id){return parseFloat(document.getElementById(id).value)||0;}
+function setN(sid,nid,v){document.getElementById(sid).value=Math.min(Math.max(v,parseFloat(document.getElementById(sid).min)||0),parseFloat(document.getElementById(sid).max)||1e9);document.getElementById(nid).value=v;}
+
+/* ═══ MASS UNIT TOGGLES ═══════════════════════════════════════════ */
+let unitB='earth', unitC='earth';
+
+function toggleUnitB(e){
+  e.preventDefault(); e.stopPropagation();
+  const nb=document.getElementById('nMb'), sl=document.getElementById('mB');
+  const cur=parseFloat(nb.value)||0;
+  const btn=document.getElementById('unitBtnB');
+  if(unitB==='earth'){
+    unitB='sol';
+    const v=(cur*M_E); nb.value=v.toFixed(6);
+    sl.min=0.000001; sl.max=10; sl.step=0.000001; sl.value=Math.min(v,10);
+    btn.textContent='M☉'; btn.classList.add('on');
+  } else {
+    unitB='earth';
+    const v=(cur/M_E); nb.value=v.toFixed(3);
+    sl.min=0.1; sl.max=100; sl.step=0.1; sl.value=Math.min(v,100);
+    btn.textContent='M⊕'; btn.classList.remove('on');
+  }
+}
+
+function toggleUnitC(e){
+  e.preventDefault(); e.stopPropagation();
+  const nb=document.getElementById('nMd'), sl=document.getElementById('mD');
+  const cur=parseFloat(nb.value)||0;
+  const btn=document.getElementById('unitBtnC');
+  if(unitC==='earth'){
+    unitC='sol';
+    const v=(cur*M_E); nb.value=v.toFixed(6);
+    sl.min=0.000001; sl.max=10; sl.step=0.000001; sl.value=Math.min(v,10);
+    btn.textContent='M☉'; btn.classList.add('on');
+  } else {
+    unitC='earth';
+    const v=(cur/M_E); nb.value=v.toFixed(3);
+    sl.min=0.1; sl.max=400000; sl.step=0.1; sl.value=Math.min(v,400000);
+    btn.textContent='M⊕'; btn.classList.remove('on');
+  }
+}
+
+function resetUnitButtons(){
+  if(unitB==='sol'){
+    unitB='earth';
+    const sl=document.getElementById('mB');
+    sl.min=0.1; sl.max=100; sl.step=0.1;
+    document.getElementById('unitBtnB').textContent='M⊕';
+    document.getElementById('unitBtnB').classList.remove('on');
+  }
+  if(unitC==='sol'){
+    unitC='earth';
+    const sl=document.getElementById('mD');
+    sl.min=0.1; sl.max=400000; sl.step=0.1;
+    document.getElementById('unitBtnC').textContent='M⊕';
+    document.getElementById('unitBtnC').classList.remove('on');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRESET LIBRARY
+═══════════════════════════════════════════════════════════════════ */
+let G_UNIT=1;
+function sd([x1,vy1,vx1,_a,_b,vy3]){return[{x:x1,y:0,vx:vx1,vy:vy1},{x:-x1,y:0,vx:-vx1,vy:vy1},{x:0,y:0,vx:0,vy:vy3}];}
+const PRESETS={
+  lagrange_equilateral:{name:'Lagrange equilateral triangle',desc:'Lagrange (1772): three equal masses at the vertices of an equilateral triangle, each orbiting the shared barycentre.',G:1,m:[1,1,1],scl:0.30,init(){const h=Math.sqrt(3)/2,r=1/Math.sqrt(3),v=Math.sqrt(1/r);return[{x:0,y:2*h/3,vx:v,vy:0},{x:-0.5,y:-h/3,vx:-v/2,vy:-v*Math.sqrt(3)/2},{x:0.5,y:-h/3,vx:-v/2,vy:v*Math.sqrt(3)/2}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['Mass 1','Mass 2','Mass 3']},
+  euler_collinear1:{name:'Euler collinear (equal masses)',desc:'Euler (1767): three equal masses collinear, rotating about their barycentre.',G:1,m:[1,1,1],scl:0.32,init(){const d=0.6,omega=Math.sqrt(1/(4*d*d)+1/(d*d));return[{x:-d,y:0,vx:0,vy:-omega*d},{x:0,y:0,vx:0,vy:0},{x:d,y:0,vx:0,vy:omega*d}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['Euler A','Euler B','Euler C']},
+  euler_collinear2:{name:'Euler collinear (unequal masses)',desc:'Euler (1767): collinear solution with masses 1, 2, 3.',G:1,m:[1,2,3],scl:0.28,init(){const x1=-0.9,x2=-0.1,x3=0.5,omega=0.72;return[{x:x1,y:0,vx:0,vy:omega*Math.abs(x1)},{x:x2,y:0,vx:0,vy:omega*Math.abs(x2)*0.1},{x:x3,y:0,vx:0,vy:omega*x3}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['m=1','m=2','m=3']},
+  euler_collinear3:{name:'Pythagorean 3:4:5 (Burrau 1913)',desc:'Masses 3, 4, 5 placed at rest at vertices of a 3:4:5 right triangle. Chaotic — the lightest body is eventually ejected.',G:1,m:[3,4,5],scl:0.20,init(){return[{x:1,y:3,vx:0,vy:0},{x:-2,y:-1,vx:0,vy:0},{x:1,y:-1,vx:0,vy:0}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['m=3','m=4','m=5']},
+  figure8:{name:'Figure-eight choreography',desc:'Moore (1993), Chenciner & Montgomery (2000): three equal masses tracing a figure-eight. Zero angular momentum.',G:1,m:[1,1,1],scl:0.35,init(){const x=0.97000436,y=-0.24308753,vx3=-0.93240737,vy3=-0.86473146;return[{x,y,vx:-vx3/2,vy:-vy3/2},{x:-x,y:-y,vx:-vx3/2,vy:-vy3/2},{x:0,y:0,vx:vx3,vy:vy3}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['Body 1','Body 2','Body 3']},
+  figure8_perturbed:{name:'Figure-eight (perturbed)',desc:'Figure-eight with a tiny velocity perturbation — demonstrates sensitivity to initial conditions.',G:1,m:[1,1,1],scl:0.35,init(){const x=0.97000436,y=-0.24308753,vx3=-0.93240737,vy3=-0.86473146;return[{x,y,vx:-vx3/2,vy:-vy3/2},{x:-x,y:-y,vx:-vx3/2,vy:-vy3/2},{x:0,y:0,vx:vx3+0.0003,vy:vy3}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['Body 1','Body 2','Body 3']},
+  broucke_a1:{name:'Broucke A1',desc:'Broucke (1975): retrograde equal-mass orbit from the BHH family.',G:1,m:[1,1,1],scl:0.30,init(){return[{x:-0.9892620043,y:0,vx:0,vy:-0.4327872979},{x:2.2096177241,y:0,vx:0,vy:0.2163936490},{x:-1.2203557197,y:0,vx:0,vy:0.2163936490}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['B-A','B-B','B-C']},
+  broucke_a2:{name:'Hénon IIa',desc:'Hénon (1976): symmetric solution, two bodies mirror each other.',G:1,m:[1,1,1],scl:0.34,init(){return[{x:0.4662036850,y:0,vx:0,vy:0.4323657300},{x:-0.4662036850,y:0,vx:0,vy:0.4323657300},{x:0,y:0,vx:0,vy:-0.8647314600}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['H-A','H-B','H-C']},
+  henon_2a:{name:'Hénon IIb',desc:'Hénon (1976): asymmetric variant of the class-II retrograde solutions.',G:1,m:[1,1,1],scl:0.34,init(){return[{x:0.4276936430,y:0,vx:0,vy:0.3828626210},{x:-0.4276936430,y:0,vx:0,vy:0.3828626210},{x:0,y:0,vx:0,vy:-0.7657252420}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['H-A','H-B','H-C']},
+  henon_2b:{name:'Hénon R1',desc:'Hénon (1976): retrograde variant with a larger outer orbit ratio.',G:1,m:[1,1,1],scl:0.32,init(){return[{x:0.3369959258,y:0,vx:0,vy:0.6195674086},{x:-0.3369959258,y:0,vx:0,vy:0.6195674086},{x:0,y:0,vx:0,vy:-1.2391348172}];},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['R-A','R-B','R-C']},
+  bumblebee:{name:'Bumblebee (I.A)',desc:'Šuvakov & Dmitrašinović (2013): one of 13 new equal-mass periodic families.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.3303138280,0.9751363227,0,-0.1339928311,0,-1.8162797916]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['B1','B2','B3']},
+  moth_i:{name:'Moth I (I.B)',desc:'Šuvakov & Dmitrašinović (2013): one body traces a figure-eight while the others orbit around it.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.4647736168,0.3974998560,0,-0.4330000000,0,0.0355002880]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['M1','M2','M3']},
+  moth_ii:{name:'Moth II (I.C)',desc:'Šuvakov & Dmitrašinović (2013): topologically distinct from Moth I despite similar appearance.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.3902862038,0.6709689859,0,-0.4364048677,0,0.2019329936]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['M1','M2','M3']},
+  butterfly_i:{name:'Butterfly I (II.A)',desc:'Šuvakov & Dmitrašinović (2013): inner and outer loops interlaced like wings.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.3055775,0.2051900,0,-0.1793136,0,-0.2318528]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['B1','B2','B3']},
+  butterfly_ii:{name:'Butterfly II (II.B)',desc:'Šuvakov & Dmitrašinović (2013): tighter inner loop ratio variant.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.3918434793,0.1649057880,0,-0.2279065960,0,0.0630008080]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['B1','B2','B3']},
+  goggles:{name:'Goggles (II.C)',desc:'Šuvakov & Dmitrašinović (2013): two looping rings resembling swimming goggles.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.8302017744,0.1263230072,0,-0.0848804712,0,-0.2526460144]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['G1','G2','G3']},
+  dragonfly:{name:'Dragonfly (III.A)',desc:'Šuvakov & Dmitrašinović (2013): four-winged orbit pattern.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.0806158512,0.5880584649,0,-0.3659735893,0,-0.8761752906]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['D1','D2','D3']},
+  yarn:{name:'Yarn (III.B)',desc:'Šuvakov & Dmitrašinović (2013): densely entangled paths resembling a ball of yarn.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.5534969431,0.3151741442,0,-0.2489786451,0,-0.3814994884]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['Y1','Y2','Y3']},
+  yin_yang_1a:{name:'Yin-yang 1a (IV.A)',desc:'Šuvakov & Dmitrašinović (2013): S-curve choreography with rotational symmetry.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.5130060840,0.4108645843,0,-0.2448492778,0,-0.5819286688]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['YY1','YY2','YY3']},
+  yin_yang_1b:{name:'Yin-yang 1b (IV.B)',desc:'Šuvakov & Dmitrašinović (2013): companion to 1a, rotating in the opposite sense.',G:1,m:[1,1,1],scl:0.33,init(){return sd([0.2827739866,0.5670831721,0,-0.3531947040,0,-0.3277768362]);},colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['YY1','YY2','YY3']},
+  proxima:{name:'Proxima Centauri system',desc:'Real astrophysical 3-body: Proxima Cen (0.122 M☉) + Proxima b & d. Vis-viva velocities, barycentre-corrected. Adjust all parameters freely.',realSystem:true,colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['Proxima Cen','Proxima b','Proxima d'],defaults:{mStar:0.122,mB:1.17,mD:0.26,aB:0.04857,aD:0.02885,eB:0.11,eD:0.04,phi:120,collR:0.003,spd:20}},
+  alpha_centauri:{name:'Alpha Centauri system',desc:'Real astrophysical 3-body: α Cen A (1.1 M☉) as the star, a candidate inner planet near the habitable zone (Body B), and α Cen B (0.9 M☉) as the massive outer companion. Demonstrates how a binary companion disrupts planetary orbits.',realSystem:true,colors:['#FF7B45','#3ECFC6','#9B7FFA'],labels:['Alpha Cen A','Alpha Cen Bb','Alpha Cen B'],defaults:{mStar:1.1,mB:1.17,mD:300700,aB:0.5,aD:17.57,eB:0.0,eD:0.52,phi:90,collR:0.003,spd:20}},
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIM STATE
+═══════════════════════════════════════════════════════════════════ */
+let bodies=[], simTime=0, E0=null, running=true, showTrails=true, collisionsOn=true;
+let currentPreset='alpha_centauri', isRealSystem=true, bgStars=null;
+let collisionLog=[], collisionFlash=0;
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+function fixBary(){
+  let px=0,py=0,cx=0,cy=0,M=0;
+  bodies.forEach(b=>{px+=b.m*b.vx;py+=b.m*b.vy;cx+=b.m*b.x;cy+=b.m*b.y;M+=b.m;});
+  bodies.forEach(b=>{b.vx-=px/M;b.vy-=py/M;b.x-=cx/M;b.y-=cy/M;});
+}
+
+function readP(){
+  return{mStar:getN('nMstar'),
+    mB: unitB==='sol' ? getN('nMb') : getN('nMb')*M_E,
+    mD: unitC==='sol' ? getN('nMd') : getN('nMd')*M_E,
+    aB:getN('nAb'),aD:getN('nAd'),eB:Math.min(getN('nEb'),0.999),eD:Math.min(getN('nEd'),0.999),phi:getN('nPhi')*Math.PI/180};
+}
+
+function loadPreset(key, applyDefaults=true){
+  currentPreset=key;
+  const p=PRESETS[key]; if(!p)return;
+  markActive(key);
+  // apply defaults ONLY when switching to a fresh preset, not on apply&reset
+  if(applyDefaults && p.defaults){
+    resetUnitButtons();
+    const d=p.defaults;
+    if(d.mStar!=null)setN('mStar','nMstar',d.mStar);
+    if(d.mB!=null)setN('mB','nMb',d.mB);
+    if(d.mD!=null)setN('mD','nMd',d.mD);
+    if(d.aB!=null)setN('aB','nAb',d.aB);
+    if(d.aD!=null)setN('aD','nAd',d.aD);
+    if(d.eB!=null)setN('eB','nEb',d.eB);
+    if(d.eD!=null)setN('eD','nEd',d.eD);
+    if(d.phi!=null)setN('phi','nPhi',d.phi);
+    if(d.collR!=null)setN('collR','nCollR',d.collR);
+    if(d.spd!=null)setN('spd','nSpd',d.spd);
+  }
+  // update name inputs to preset defaults only on fresh switch
+  if(applyDefaults){
+    document.getElementById('nameA').value=p.labels[0];
+    document.getElementById('nameB').value=p.labels[1];
+    document.getElementById('nameC').value=p.labels[2];
+  }
+  const lA=document.getElementById('nameA').value||p.labels[0];
+  const lB=document.getElementById('nameB').value||p.labels[1];
+  const lC=document.getElementById('nameC').value||p.labels[2];
+  document.getElementById('lgA').textContent=lA;
+  document.getElementById('lgB').textContent=lB;
+  document.getElementById('lgC').textContent=lC;
+  document.getElementById('dotA').style.background=p.colors[0];
+  document.getElementById('dotB').style.background=p.colors[1];
+  document.getElementById('dotC').style.background=p.colors[2];
+  document.getElementById('presetLabel').textContent=p.name;
+  document.getElementById('presetDesc').textContent=p.desc||'';
+  isRealSystem=!!p.realSystem;
+  document.getElementById('realParams').style.display=isRealSystem?'':'none';
+  document.getElementById('periodicParams').style.display=isRealSystem?'none':'';
+  document.getElementById('keplerPanel').style.display=isRealSystem?'':'none';
+
+  simTime=0;E0=null;bgStars=null;collisionLog=[];
+  document.getElementById('collLog').innerHTML='';
+  viewZoom=1;panX=0;panY=0;updateZL();
+
+  if(isRealSystem){initReal();}
+  else{
+    G_UNIT=p.G||1;
+    const ic=p.init(),m=p.m||[1,1,1];
+    const xs=ic.map(b=>Math.abs(b.x)),ys=ic.map(b=>Math.abs(b.y));
+    const maxR=Math.max(...xs,...ys,0.1);
+    baseScale=(Math.min(W,H)*0.40)/maxR*(p.scl||0.33);
+    bodies=ic.map((b,i)=>({x:b.x,y:b.y,vx:b.vx,vy:b.vy,m:m[i],r:6,color:p.colors[i],name:p.labels[i],trail:[],alive:true}));
+    fixBary();
+  }
+}
+
+function initReal(){
+  const p=readP();
+  const nameA=document.getElementById('nameA').value||'Body A';
+  const nameB=document.getElementById('nameB').value||'Body B';
+  const nameC=document.getElementById('nameC').value||'Body C';
+  const vBp=Math.sqrt(G_AU*p.mStar/p.aB*(1+p.eB)/(1-p.eB));
+  const vDp=Math.sqrt(G_AU*p.mStar/p.aD*(1+p.eD)/(1-p.eD));
+  const rBp=p.aB*(1-p.eB),rDp=p.aD*(1-p.eD),apB=p.aB*(1+p.eB);
+  baseScale=(Math.min(W,H)*0.40)/Math.max(apB,p.aD*(1+p.eD));
+  bodies=[
+    {x:0,y:0,vx:0,vy:0,m:p.mStar,r:12,color:'#FF7B45',name:nameA,trail:[],alive:true},
+    {x:rBp,y:0,vx:0,vy:vBp,m:p.mB,r:5,color:'#3ECFC6',name:nameB,trail:[],alive:true},
+    {x:rDp*Math.cos(p.phi),y:rDp*Math.sin(p.phi),vx:-vDp*Math.sin(p.phi),vy:vDp*Math.cos(p.phi),m:p.mD,r:3.5,color:'#9B7FFA',name:nameC,trail:[],alive:true},
+  ];
+  // scale body C radius for stellar mass objects
+  if(p.mD>0.1){bodies[2].r=Math.max(3.5,Math.min(10,3.5+Math.log10(p.mD*333000)*2));}
+  fixBary();
+  updateKepler();
+}
+
+function markActive(k){document.querySelectorAll('.pb').forEach(b=>b.classList.toggle('active',(b.getAttribute('onclick')||'').includes("'"+k+"'")));}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHYSICS
+═══════════════════════════════════════════════════════════════════ */
+function getG(){return isRealSystem?G_AU:G_UNIT;}
+
+function accel(bs){
+  const n=bs.length,ax=new Array(n).fill(0),ay=new Array(n).fill(0),Gv=getG();
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+    if(i===j||!bs[j].alive||!bs[i].alive)continue;
+    const dx=bs[j].x-bs[i].x,dy=bs[j].y-bs[i].y,r3=Math.pow(dx*dx+dy*dy+1e-9,1.5);
+    ax[i]+=Gv*bs[j].m*dx/r3;ay[i]+=Gv*bs[j].m*dy/r3;
+  }
+  return{ax,ay};
+}
+
+function rk4(dt){
+  const n=bodies.length;
+  const x0=bodies.map(b=>b.x),y0=bodies.map(b=>b.y),u0=bodies.map(b=>b.vx),v0=bodies.map(b=>b.vy);
+  function d(xs,ys,us,vs){const tmp=bodies.map((b,i)=>({...b,x:xs[i],y:ys[i],vx:us[i],vy:vs[i]}));const{ax,ay}=accel(tmp);return{dx:us,dy:vs,du:ax,dv:ay};}
+  const k1=d(x0,y0,u0,v0);
+  const k2=d(x0.map((v,i)=>v+k1.dx[i]*dt/2),y0.map((v,i)=>v+k1.dy[i]*dt/2),u0.map((v,i)=>v+k1.du[i]*dt/2),v0.map((v,i)=>v+k1.dv[i]*dt/2));
+  const k3=d(x0.map((v,i)=>v+k2.dx[i]*dt/2),y0.map((v,i)=>v+k2.dy[i]*dt/2),u0.map((v,i)=>v+k2.du[i]*dt/2),v0.map((v,i)=>v+k2.dv[i]*dt/2));
+  const k4=d(x0.map((v,i)=>v+k3.dx[i]*dt),y0.map((v,i)=>v+k3.dy[i]*dt),u0.map((v,i)=>v+k3.du[i]*dt),v0.map((v,i)=>v+k3.dv[i]*dt));
+  bodies.forEach((b,i)=>{
+    if(!b.alive)return;
+    b.x+=dt/6*(k1.dx[i]+2*k2.dx[i]+2*k3.dx[i]+k4.dx[i]);
+    b.y+=dt/6*(k1.dy[i]+2*k2.dy[i]+2*k3.dy[i]+k4.dy[i]);
+    b.vx+=dt/6*(k1.du[i]+2*k2.du[i]+2*k3.du[i]+k4.du[i]);
+    b.vy+=dt/6*(k1.dv[i]+2*k2.dv[i]+2*k3.dv[i]+k4.dv[i]);
+  });
+}
+
+const BASE_REAL=0.08/YR2DAY, BASE_UNIT=0.0005;
+let lastDt=BASE_UNIT;
+
+function adaptDt(){
+  let minR=Infinity;
+  const alive=bodies.filter(b=>b.alive);
+  for(let i=0;i<alive.length;i++)for(let j=i+1;j<alive.length;j++){
+    const dx=alive[j].x-alive[i].x,dy=alive[j].y-alive[i].y;
+    minR=Math.min(minR,Math.sqrt(dx*dx+dy*dy));
+  }
+  const base=isRealSystem?BASE_REAL:BASE_UNIT,thr=isRealSystem?0.004:0.05;
+  return minR<thr?base*Math.max(0.01,minR/thr):base;
+}
+
+function energy(){
+  let E=0;const Gv=getG();
+  const alive=bodies.filter(b=>b.alive);
+  for(let i=0;i<alive.length;i++){
+    E+=0.5*alive[i].m*(alive[i].vx**2+alive[i].vy**2);
+    for(let j=i+1;j<alive.length;j++){
+      const dx=alive[j].x-alive[i].x,dy=alive[j].y-alive[i].y;
+      E-=Gv*alive[i].m*alive[j].m/Math.sqrt(dx*dx+dy*dy+1e-12);
+    }
+  }
+  return E;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   COLLISION DETECTION & MERGE
+═══════════════════════════════════════════════════════════════════ */
+function checkCollisions(){
+  if(!collisionsOn)return;
+  const cr=isRealSystem?getN('nCollR'):getN('nCollR2');
+  for(let i=0;i<bodies.length;i++){
+    if(!bodies[i].alive)continue;
+    for(let j=i+1;j<bodies.length;j++){
+      if(!bodies[j].alive)continue;
+      const dx=bodies[j].x-bodies[i].x,dy=bodies[j].y-bodies[i].y;
+      if(Math.sqrt(dx*dx+dy*dy)<cr){
+        // inelastic merge: momentum conserved
+        const M=bodies[i].m+bodies[j].m;
+        const mx=(bodies[i].m*bodies[i].x+bodies[j].m*bodies[j].x)/M;
+        const my=(bodies[i].m*bodies[i].y+bodies[j].m*bodies[j].y)/M;
+        const mvx=(bodies[i].m*bodies[i].vx+bodies[j].m*bodies[j].vx)/M;
+        const mvy=(bodies[i].m*bodies[i].vy+bodies[j].m*bodies[j].vy)/M;
+        const newR=Math.cbrt(bodies[i].r**3+bodies[j].r**3);
+        const newColor=bodies[i].m>=bodies[j].m?bodies[i].color:bodies[j].color;
+        const newName=bodies[i].m>=bodies[j].m?bodies[i].name:bodies[j].name;
+        bodies[i]={...bodies[i],x:mx,y:my,vx:mvx,vy:mvy,m:M,r:newR,color:newColor,name:newName+'*',trail:[]};
+        bodies[j].alive=false;
+        E0=null; // reset energy baseline after merge
+        collisionFlash=8;
+        const msg=`T=${simTime.toFixed(3)}: ${bodies[i].name} + ${bodies[j].name} merged`;
+        collisionLog.unshift(msg);
+        if(collisionLog.length>6)collisionLog.pop();
+        renderCollLog();
+      }
+    }
+  }
+}
+
+function renderCollLog(){
+  document.getElementById('collLog').innerHTML=collisionLog.map(m=>`<div><span>💥</span> ${m}</div>`).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STABILITY
+═══════════════════════════════════════════════════════════════════ */
+function stabClass(){
+  if(!E0)return{s:'init',c:'b-warn'};
+  const drift=Math.abs((energy()-E0)/Math.abs(E0));
+  if(drift>0.05)return{s:'chaotic',c:'b-bad'};
+  if(drift>0.005)return{s:'marginal',c:'b-warn'};
+  return{s:'stable',c:'b-ok'};
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   KEPLER OVERLAY
+═══════════════════════════════════════════════════════════════════ */
+function updateKepler(){
+  if(!isRealSystem||bodies.length<3)return;
+  const p=readP();
+  const fmt5=v=>v.toFixed(5)+' AU';
+  const fmtD=v=>(v*YR2DAY).toFixed(2)+' d';
+  const Tb=2*Math.PI*Math.sqrt(p.aB**3/(G_AU*p.mStar));
+  const Td=2*Math.PI*Math.sqrt(p.aD**3/(G_AU*p.mStar));
+  document.getElementById('kPb').textContent=fmtD(Tb);
+  document.getElementById('kPd').textContent=fmtD(Td);
+  document.getElementById('kApB').textContent=fmt5(p.aB*(1+p.eB));
+  document.getElementById('kApD').textContent=fmt5(p.aD*(1+p.eD));
+  document.getElementById('kPeB').textContent=fmt5(p.aB*(1-p.eB));
+  document.getElementById('kPeD').textContent=fmt5(p.aD*(1-p.eD));
+  document.getElementById('kSmaB').textContent=fmt5(p.aB);
+  document.getElementById('kSmaD').textContent=fmt5(p.aD);
+  // live velocities
+  if(bodies.length>=3&&bodies[1]&&bodies[2]){
+    document.getElementById('kVb').textContent=(Math.sqrt(bodies[1].vx**2+bodies[1].vy**2)*AU2KMS).toFixed(2)+' km/s';
+    document.getElementById('kVd').textContent=(Math.sqrt(bodies[2].vx**2+bodies[2].vy**2)*AU2KMS).toFixed(2)+' km/s';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DRAW
+═══════════════════════════════════════════════════════════════════ */
+bgStars=null;
+function initStars(){
+  bgStars=Array.from({length:isDark?240:80},()=>({x:Math.random()*1400-200,y:Math.random()*600-50,s:Math.random()*1.1+0.2,a:Math.random()*(isDark?0.5:0.15)+0.1}));
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const canvasBg=isDark?'#07071a':'#0a0a1a';
+  ctx.fillStyle=canvasBg; ctx.fillRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle=isDark?'rgba(255,255,255,0.025)':'rgba(255,255,255,0.04)';
+  ctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=38){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=38){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // bg stars
+  if(!bgStars)initStars();
+  bgStars.forEach(s=>{ctx.beginPath();ctx.arc(s.x,s.y,s.s,0,Math.PI*2);ctx.fillStyle=`rgba(255,255,255,${s.a})`;ctx.fill();});
+  // orbit guides (real system)
+  if(isRealSystem&&bodies.length>=3){
+    const p=readP();
+    ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.lineWidth=0.5;
+    [p.aB,p.aD].forEach(a=>{
+      const{px:cx,py:cy}=w2s(0,0);
+      ctx.beginPath();ctx.ellipse(cx,cy,a*baseScale*viewZoom,a*baseScale*viewZoom,0,0,Math.PI*2);ctx.stroke();
+    });
+  }
+  // trails
+  if(showTrails){
+    bodies.forEach(b=>{
+      const t=b.trail;if(t.length<2)return;
+      for(let i=1;i<t.length;i++){
+        const alpha=(i/t.length)*0.55;
+        const{px:x1,py:y1}=w2s(t[i-1][0],t[i-1][1]);
+        const{px:x2,py:y2}=w2s(t[i][0],t[i][1]);
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+        ctx.strokeStyle=b.color+Math.floor(alpha*255).toString(16).padStart(2,'0');
+        ctx.lineWidth=1;ctx.stroke();
+      }
+    });
+  }
+  // bodies
+  bodies.forEach(b=>{
+    if(!b.alive)return;
+    const{px,py}=w2s(b.x,b.y);
+    const sr=Math.max(b.r,2);
+    if(collisionFlash>0){
+      ctx.beginPath();ctx.arc(px,py,sr*5,0,Math.PI*2);
+      ctx.fillStyle=b.color+'22';ctx.fill();
+    }
+    const gl=ctx.createRadialGradient(px,py,0,px,py,sr*3.5);
+    gl.addColorStop(0,b.color+'cc');gl.addColorStop(0.45,b.color+'44');gl.addColorStop(1,b.color+'00');
+    ctx.beginPath();ctx.arc(px,py,sr*3.5,0,Math.PI*2);ctx.fillStyle=gl;ctx.fill();
+    ctx.beginPath();ctx.arc(px,py,sr,0,Math.PI*2);ctx.fillStyle=b.color;ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.6)';ctx.font='9px monospace';
+    ctx.fillText(b.name,px+sr+4,py-sr+2);
+  });
+  if(collisionFlash>0)collisionFlash--;
+  // ── draw telemetry text directly on canvas (exports with PNG/SVG) ──
+  const alive2=bodies.filter(b=>b.alive);
+  const spd2=getRawSpd();
+  const spdLabel2=spd2<=0?`slow ×1/${1+Math.abs(spd2)}`:`×${spd2}`;
+  const b2=alive2[1]||null, d2=alive2[2]||null;
+  const dist2=b2&&d2?Math.sqrt((b2.x-d2.x)**2+(b2.y-d2.y)**2).toFixed(4):'—';
+  const vb2=b2?Math.sqrt(b2.vx**2+b2.vy**2).toFixed(4):'—';
+  const vd2=d2?Math.sqrt(d2.vx**2+d2.vy**2).toFixed(4):'—';
+  const dt2=(lastDt*1e4).toFixed(3);
+  const {s:stab2,c:stabC2}=stabClass();
+  const stabCol2=stabC2==='b-ok'?'#4ade80':stabC2==='b-warn'?'#fbbf24':'#f87171';
+  let drift2str='—';
+  if(E0!==null){const dr=Math.abs((energy()-E0)/Math.abs(E0))*100;drift2str=dr.toFixed(4)+'%';}
+  const amStr=(!isRealSystem)?` | L: ${angularMomentum().toExponential(2)}`:'';
+
+  ctx.font='9px monospace';
+  const lh=16, lx=10;
+  let ly=18;
+  const dim='rgba(255,255,255,0.35)', bright='rgba(255,255,255,0.75)';
+
+  function tline(label, value, valColor){
+    ctx.fillStyle=dim; ctx.fillText(label, lx, ly);
+    const lw=ctx.measureText(label).width;
+    ctx.fillStyle=valColor||bright; ctx.fillText(value, lx+lw, ly);
+    ly+=lh;
+  }
+
+  tline(`bodies: `,`${alive2.length}  |  zoom: ${viewZoom.toFixed(2)}×  |  speed: ${spdLabel2}`);
+  tline(`sim time: `,simTime.toFixed(4)+' yr');
+  ctx.fillStyle=dim; ctx.fillText(`stability: `, lx, ly);
+  const slw=ctx.measureText(`stability: `).width;
+  ctx.fillStyle=stabCol2; ctx.fillText(stab2, lx+slw, ly); ly+=lh;
+  tline(`b–c sep: `, dist2);
+  tline(`body B spd: `, vb2);
+  tline(`body C spd: `, vd2);
+  tline(`dt ×10⁻⁴: `, dt2);
+  tline(`energy err: `, drift2str);
+  if(!isRealSystem){tline(`ang. mom L: `, angularMomentum().toExponential(2));}
+  document.getElementById('canvasInfo').textContent='';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HUD  (hidden DOM elements kept for Kepler panel only)
+═══════════════════════════════════════════════════════════════════ */
+function angularMomentum(){
+  return bodies.filter(b=>b.alive).reduce((L,b)=>L+b.m*(b.x*b.vy-b.y*b.vx),0);
+}
+
+function updateHUD(){
+  // All live stats now drawn on canvas inside draw().
+  // Just update Kepler panel (DOM) for real system.
+  if(isRealSystem) updateKepler();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAIN LOOP
+═══════════════════════════════════════════════════════════════════ */
+let trailTick=0, slowTick=0;
+function getRawSpd(){return Math.round(isRealSystem?getN('nSpd'):getN('nSpd2'));}
+
+function loop(){
+  if(running&&bodies.some(b=>b.alive)){
+    const spd=getRawSpd();
+    let doStep=true;
+    if(spd<=0){
+      // slow-motion: run 1 step every (1 + |spd|) frames
+      const interval=1+Math.abs(spd);
+      slowTick=(slowTick+1)%interval;
+      doStep=(slowTick===0);
+    } else {
+      slowTick=0;
+    }
+    if(doStep){
+      const steps=Math.max(1,spd);
+      for(let i=0;i<steps;i++){
+        const dt=adaptDt();lastDt=dt;
+        rk4(dt);simTime+=dt;
+        checkCollisions();
+        if(++trailTick>=5){trailTick=0;bodies.forEach(b=>{if(!b.alive)return;b.trail.push([b.x,b.y]);if(b.trail.length>900)b.trail.shift();});}
+      }
+    }
+    if(E0===null)E0=energy();
+  }
+  draw();updateHUD();
+  requestAnimationFrame(loop);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXPORT — SVG & PNG
+═══════════════════════════════════════════════════════════════════ */
+function exportSVG(){
+  const svgW=W,svgH=H;
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" style="background:#07071a">`;
+  // grid
+  svg+=`<g stroke="rgba(255,255,255,0.04)" stroke-width="0.5">`;
+  for(let x=0;x<svgW;x+=38)svg+=`<line x1="${x}" y1="0" x2="${x}" y2="${svgH}"/>`;
+  for(let y=0;y<svgH;y+=38)svg+=`<line x1="0" y1="${y}" x2="${svgW}" y2="${y}"/>`;
+  svg+=`</g>`;
+  // trails
+  bodies.forEach(b=>{
+    const t=b.trail; if(t.length<2)return;
+    const pts=t.map(p=>{const{px,py}=w2s(p[0],p[1]);return`${px.toFixed(1)},${py.toFixed(1)}`;}).join(' ');
+    svg+=`<polyline points="${pts}" fill="none" stroke="${b.color}" stroke-width="1" stroke-opacity="0.45"/>`;
+  });
+  // bodies
+  bodies.forEach(b=>{
+    if(!b.alive)return;
+    const{px,py}=w2s(b.x,b.y);
+    svg+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(b.r*3).toFixed(1)}" fill="${b.color}" fill-opacity="0.3"/>`;
+    svg+=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${b.r.toFixed(1)}" fill="${b.color}"/>`;
+    svg+=`<text x="${(px+b.r+4).toFixed(1)}" y="${(py-b.r+2).toFixed(1)}" font-family="monospace" font-size="9" fill="rgba(255,255,255,0.6)">${b.name}</text>`;
+  });
+  svg+=`<text x="8" y="16" font-family="monospace" font-size="9" fill="rgba(255,255,255,0.3)">t=${simTime.toFixed(4)} | ${currentPreset}</text>`;
+  svg+=`</svg>`;
+  const blob=new Blob([svg],{type:'image/svg+xml'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`3body_${currentPreset}_t${simTime.toFixed(2)}.svg`;a.click();
+}
+
+function exportPNG(){
+  // render to offscreen canvas at full DPR for crisp export
+  const oc=document.createElement('canvas');
+  oc.width=W*DPR;oc.height=H*DPR;
+  const oc2=oc.getContext('2d');
+  oc2.drawImage(canvas,0,0);
+  oc.toBlob(blob=>{
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=`3body_${currentPreset}_t${simTime.toFixed(2)}.png`;a.click();
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SAVE / LOAD (localStorage)
+═══════════════════════════════════════════════════════════════════ */
+const LS_KEY='proxima3b_v3';
+function getSlots(){try{return JSON.parse(localStorage.getItem(LS_KEY))||[];}catch{return[];}}
+function setSlots(s){localStorage.setItem(LS_KEY,JSON.stringify(s));}
+
+function captureState(){
+  if(isRealSystem){
+    return{type:'real',preset:currentPreset,
+      mStar:getN('nMstar'),mB:getN('nMb'),mD:getN('nMd'),
+      aB:getN('nAb'),aD:getN('nAd'),eB:getN('nEb'),eD:getN('nEd'),
+      phi:getN('nPhi'),collR:getN('nCollR'),spd:getN('nSpd'),
+      nameA:document.getElementById('nameA').value,
+      nameB:document.getElementById('nameB').value,
+      nameC:document.getElementById('nameC').value};
+  }
+  return{type:'periodic',preset:currentPreset,spd:getN('nSpd2'),collR2:getN('nCollR2')};
+}
+
+function applyState(st){
+  if(st.type==='periodic'){
+    setN('spd2','nSpd2',st.spd||60);setN('collR2','nCollR2',st.collR2||0.05);
+    loadPreset(st.preset);return;
+  }
+  const map={mStar:['mStar','nMstar'],mB:['mB','nMb'],mD:['mD','nMd'],
+    aB:['aB','nAb'],aD:['aD','nAd'],eB:['eB','nEb'],eD:['eD','nEd'],
+    phi:['phi','nPhi'],collR:['collR','nCollR'],spd:['spd','nSpd']};
+  Object.entries(map).forEach(([k,[sid,nid]])=>{if(st[k]!=null)setN(sid,nid,st[k]);});
+  if(st.nameA)document.getElementById('nameA').value=st.nameA;
+  if(st.nameB)document.getElementById('nameB').value=st.nameB;
+  if(st.nameC)document.getElementById('nameC').value=st.nameC;
+  loadPreset(st.preset||'alpha_centauri', false);
+}
+
+function saveSlot(){
+  const name=document.getElementById('saveNameInput').value.trim();
+  if(!name){alert('Enter a name first.');return;}
+  const slots=getSlots();
+  const idx=slots.findIndex(s=>s.name===name);
+  const entry={name,state:captureState(),preset:currentPreset,time:new Date().toLocaleString()};
+  if(idx>=0)slots[idx]=entry;else slots.unshift(entry);
+  setSlots(slots);
+  document.getElementById('saveNameInput').value='';
+  renderSlots();
+}
+function loadSlot(i){applyState(getSlots()[i]?.state);}
+function deleteSlot(i){const s=getSlots();s.splice(i,1);setSlots(s);renderSlots();}
+
+function renderSlots(){
+  const slots=getSlots(),el=document.getElementById('slotList');
+  if(!slots.length){el.innerHTML='<div class="empty-state">no saved configurations yet</div>';return;}
+  el.innerHTML=slots.map((s,i)=>`
+    <div class="slot">
+      <div class="slot-info">
+        <div class="slot-name">${s.name}</div>
+        <div class="slot-meta">${s.preset} · ${s.time}</div>
+      </div>
+      <div class="slot-acts">
+        <button class="info-btn" onclick="loadSlot(${i})">load</button>
+        <button class="danger" onclick="deleteSlot(${i})">del</button>
+      </div>
+    </div>`).join('');
+}
+
+function exportJSON(){
+  const b=new Blob([JSON.stringify(getSlots(),null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='3body_saves.json';a.click();
+}
+function triggerImport(){document.getElementById('importFile').click();}
+function handleImport(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{const d=JSON.parse(ev.target.result);
+      if(Array.isArray(d)){const m=getSlots();d.forEach(s=>{if(!m.find(x=>x.name===s.name))m.push(s);});setSlots(m);renderSlots();alert('Imported '+d.length+' slots.');}
+    }catch{alert('Invalid JSON.');}
+  };
+  r.readAsText(f);e.target.value='';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONTROL BUTTONS
+═══════════════════════════════════════════════════════════════════ */
+document.getElementById('btnPlay').addEventListener('click',function(){
+  running=!running;this.textContent=running?'⏸ pause':'▶ play';this.classList.toggle('on',running);
+});
+document.getElementById('btnReset').addEventListener('click',()=>loadPreset(currentPreset, false));
+document.getElementById('btnTrails').addEventListener('click',function(){
+  showTrails=!showTrails;this.textContent=showTrails?'trails on':'trails off';
+  this.classList.toggle('on',showTrails);if(!showTrails)bodies.forEach(b=>b.trail=[]);
+});
+document.getElementById('btnPerturb').addEventListener('click',()=>{
+  const mag=isRealSystem?0.015:0.005;
+  bodies.forEach((b,i)=>{if(i>0&&b.alive){b.vx+=(Math.random()-.5)*mag;b.vy+=(Math.random()-.5)*mag;}});
+  E0=null;
+});
+document.getElementById('btnCentre').addEventListener('click',()=>{panX=0;panY=0;});
+document.getElementById('btnCollision').addEventListener('click',function(){
+  collisionsOn=!collisionsOn;this.textContent=collisionsOn?'💥 collisions on':'💥 collisions off';
+  this.classList.toggle('on',collisionsOn);
+});
+document.getElementById('btnApply').addEventListener('click',()=>{loadPreset(currentPreset, false);});
+
+/* ═══ APPLY NAMES ═══════════════════════════════════════════════════ */
+document.getElementById('btnApplyNames').addEventListener('click',()=>{
+  const nA=document.getElementById('nameA').value||'Body A';
+  const nB=document.getElementById('nameB').value||'Body B';
+  const nC=document.getElementById('nameC').value||'Body C';
+  if(bodies[0])bodies[0].name=nA;
+  if(bodies[1])bodies[1].name=nB;
+  if(bodies[2])bodies[2].name=nC;
+  document.getElementById('lgA').textContent=nA;
+  document.getElementById('lgB').textContent=nB;
+  document.getElementById('lgC').textContent=nC;
+});
+
+/* ═══ FULLSCREEN ════════════════════════════════════════════════════ */
+const canvasWrap=document.getElementById('canvasWrap');
+const btnFS=document.getElementById('btnFS');
+
+function enterFullscreen(){
+  isFullscreen=true;
+  canvasWrap.classList.add('in-fullscreen');
+  btnFS.textContent='✕';
+  btnFS.title='Exit fullscreen (Esc / F)';
+  resizeCanvas();
+}
+function exitFullscreen(){
+  isFullscreen=false;
+  canvasWrap.classList.remove('in-fullscreen');
+  btnFS.textContent='⛶';
+  btnFS.title='Toggle fullscreen';
+  resizeCanvas();
+}
+btnFS.addEventListener('click',()=>{isFullscreen?exitFullscreen():enterFullscreen();});
+
+// Also support browser native fullscreen via the canvas wrap
+canvasWrap.addEventListener('dblclick',()=>{
+  if(!isFullscreen) enterFullscreen(); else exitFullscreen();
+});
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&isFullscreen){exitFullscreen();return;}
+  if(e.key==='f'||e.key==='F'){
+    const tag=document.activeElement.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA')return;
+    isFullscreen?exitFullscreen():enterFullscreen();
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════════════ */
+loadPreset('alpha_centauri');
+renderSlots();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
